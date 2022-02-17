@@ -86,13 +86,15 @@ Global Variables
   to ``abi.encodeWithSelector(bytes4(keccak256(bytes(signature)), ...)``
 - ``bytes.concat(...) returns (bytes memory)``: :ref:`Concatenates variable number of
   arguments to one byte array<bytes-concat>`
+- ``string.concat(...) returns (string memory)``: :ref:`Concatenates variable number of
+  arguments to one string array<string-concat>`
 - ``block.basefee`` (``uint``): current block's base fee (`EIP-3198 <https://eips.ethereum.org/EIPS/eip-3198>`_ and `EIP-1559 <https://eips.ethereum.org/EIPS/eip-1559>`_)
 - ``block.chainid`` (``uint``): current chain id
 - ``block.coinbase`` (``address payable``): current block miner's address
 - ``block.difficulty`` (``uint``): current block difficulty
 - ``block.gaslimit`` (``uint``): current block gaslimit
 - ``block.number`` (``uint``): current block number
-- ``block.timestamp`` (``uint``): current block timestamp
+- ``block.timestamp`` (``uint``): current block timestamp in seconds since Unix epoch
 - ``gasleft() returns (uint256)``: remaining gas
 - ``msg.data`` (``bytes``): complete calldata
 - ``msg.sender`` (``address``): sender of the message (current call)

@@ -101,7 +101,7 @@ Json::Value ABI::generate(ContractDefinition const& _contractDef)
 			method["stateMutability"] = stateMutabilityToString(externalFunctionType->stateMutability());
 			abi.emplace(std::move(method));
 		}
-	for (auto const& it: _contractDef.interfaceEvents())
+	for (auto const& it: _contractDef.definedInterfaceEvents())
 	{
 		Json::Value event{Json::objectValue};
 		event["type"] = "event";
@@ -176,7 +176,7 @@ Json::Value ABI::formatType(
 		ret["type"] = _encodingType.canonicalName() + suffix;
 	else if (ArrayType const* arrayType = dynamic_cast<ArrayType const*>(&_encodingType))
 	{
-		if (arrayType->isByteArray())
+		if (arrayType->isByteArrayOrString())
 			ret["type"] = _encodingType.canonicalName() + suffix;
 		else
 		{

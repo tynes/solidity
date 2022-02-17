@@ -1206,7 +1206,7 @@ BoolResult StringLiteralType::isImplicitlyConvertibleTo(Type const& _convertTo) 
 			);
 		return
 			arrayType->location() != DataLocation::CallData &&
-			arrayType->isByteArray() &&
+			arrayType->isByteArrayOrString() &&
 			!(arrayType->dataStoredIn(DataLocation::Storage) && arrayType->isPointer());
 	}
 	else
@@ -1571,11 +1571,11 @@ BoolResult ArrayType::isExplicitlyConvertibleTo(Type const& _convertTo) const
 		return true;
 	// allow conversion bytes <-> string and bytes -> bytesNN
 	if (_convertTo.category() != category())
-		return isByteArray() && !isString() && _convertTo.category() == Type::Category::FixedBytes;
+		return isByteArray() && _convertTo.category() == Type::Category::FixedBytes;
 	auto& convertTo = dynamic_cast<ArrayType const&>(_convertTo);
 	if (convertTo.location() != location())
 		return false;
-	if (!isByteArray() || !convertTo.isByteArray())
+	if (!isByteArrayOrString() || !convertTo.isByteArrayOrString())
 		return false;
 	return true;
 }
@@ -1585,7 +1585,7 @@ string ArrayType::richIdentifier() const
 	string id;
 	if (isString())
 		id = "t_string";
-	else if (isByteArray())
+	else if (isByteArrayOrString())
 		id = "t_bytes";
 	else
 	{
@@ -1751,7 +1751,7 @@ string ArrayType::toString(bool _short) const
 	string ret;
 	if (isString())
 		ret = "string";
-	else if (isByteArray())
+	else if (isByteArrayOrString())
 		ret = "bytes";
 	else
 	{
@@ -1770,7 +1770,7 @@ string ArrayType::canonicalName() const
 	string ret;
 	if (isString())
 		ret = "string";
-	else if (isByteArray())
+	else if (isByteArrayOrString())
 		ret = "bytes";
 	else
 	{
@@ -1784,7 +1784,7 @@ string ArrayType::canonicalName() const
 
 string ArrayType::signatureInExternalFunction(bool _structsByName) const
 {
-	if (isByteArray())
+	if (isByteArrayOrString())
 		return canonicalName();
 	else
 	{
@@ -1899,7 +1899,7 @@ u256 ArrayType::memoryDataSize() const
 {
 	solAssert(!isDynamicallySized(), "");
 	solAssert(m_location == DataLocation::Memory, "");
-	solAssert(!isByteArray(), "");
+	solAssert(!isByteArrayOrString(), "");
 	bigint size = bigint(m_length) * m_baseType->memoryHeadSize();
 	solAssert(size <= numeric_limits<u256>::max(), "Array size does not fit u256.");
 	return u256(size);
@@ -2701,7 +2701,7 @@ FunctionType::FunctionType(VariableDeclaration const& _varDecl):
 		}
 		else if (auto arrayType = dynamic_cast<ArrayType const*>(returnType))
 		{
-			if (arrayType->isByteArray())
+			if (arrayType->isByteArrayOrString())
 				// Return byte arrays as whole.
 				break;
 			returnType = arrayType->baseType();
@@ -2720,7 +2720,7 @@ FunctionType::FunctionType(VariableDeclaration const& _varDecl):
 			if (member.type->category() != Category::Mapping)
 			{
 				if (auto arrayType = dynamic_cast<ArrayType const*>(member.type))
-					if (!arrayType->isByteArray())
+					if (!arrayType->isByteArrayOrString())
 						continue;
 				m_returnParameterTypes.push_back(TypeProvider::withLocationIfReference(
 					DataLocation::Memory,
@@ -2928,6 +2928,7 @@ string FunctionType::richIdentifier() const
 	case Kind::ArrayPush: id += "arraypush"; break;
 	case Kind::ArrayPop: id += "arraypop"; break;
 	case Kind::BytesConcat: id += "bytesconcat"; break;
+	case Kind::StringConcat: id += "stringconcat"; break;
 	case Kind::ObjectCreation: id += "objectcreation"; break;
 	case Kind::Assert: id += "assert"; break;
 	case Kind::Require: id += "require"; break;
@@ -3813,19 +3814,18 @@ MemberList::MemberMap TypeType::nativeMembers(ASTNode const* _currentScope) cons
 	}
 	else if (
 		auto const* arrayType = dynamic_cast<ArrayType const*>(m_actualType);
-		arrayType && arrayType->isByteArray()
+		arrayType && arrayType->isByteArrayOrString()
 	)
 		members.emplace_back("concat", TypeProvider::function(
 			TypePointers{},
-			TypePointers{TypeProvider::bytesMemory()},
+			TypePointers{arrayType->isString() ? TypeProvider::stringMemory() : TypeProvider::bytesMemory()},
 			strings{},
-			strings{string()},
-			FunctionType::Kind::BytesConcat,
+			strings{string{}},
+			arrayType->isString() ? FunctionType::Kind::StringConcat : FunctionType::Kind::BytesConcat,
 			StateMutability::Pure,
 			nullptr,
 			FunctionType::Options::withArbitraryParameters()
 		));
-
 	return members;
 }
 
