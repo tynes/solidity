@@ -4,7 +4,7 @@ Language Features:
 
 
 Compiler Features:
- * Yul Optimizer: Remove redundant calls to ``sstore`` and ``mmstore``.
+ * Yul Optimizer: Remove ``sstore`` and ``mstore`` operations that are never read from.
 
 
 Bugfixes:
