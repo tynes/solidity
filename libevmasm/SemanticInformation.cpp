@@ -245,6 +245,7 @@ SemanticInformation::Effect SemanticInformation::memory(Instruction _instruction
 	case Instruction::RETURNDATACOPY:
 	case Instruction::MSTORE:
 	case Instruction::MSTORE8:
+	case Instruction::TSTORE:
 	case Instruction::CALL:
 	case Instruction::CALLCODE:
 	case Instruction::DELEGATECALL:
@@ -255,6 +256,7 @@ SemanticInformation::Effect SemanticInformation::memory(Instruction _instruction
 	case Instruction::CREATE2:
 	case Instruction::KECCAK256:
 	case Instruction::MLOAD:
+	case Instruction::TLOAD:
 	case Instruction::MSIZE:
 	case Instruction::RETURN:
 	case Instruction::REVERT:

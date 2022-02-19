@@ -103,6 +103,9 @@ enum class Instruction: uint8_t
 	MSIZE,				///< get the size of active memory
 	GAS,				///< get the amount of available gas
 	JUMPDEST,			///< set a potential jump destination
+	TLOAD,              ///< load word into transient memory (0x5c)
+	TSTORE,             ///< save word to transient memory (0x5d)
+
 
 	PUSH1 = 0x60,		///< place 1 byte item on stack
 	PUSH2,				///< place 2 byte item on stack
