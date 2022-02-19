@@ -57,6 +57,10 @@ DataFlowAnalyzer::DataFlowAnalyzer(
 		m_storeFunctionName[static_cast<unsigned>(StoreLoadLocation::Storage)] = builtin->name;
 	if (auto const* builtin = _dialect.storageLoadFunction(YulString{}))
 		m_loadFunctionName[static_cast<unsigned>(StoreLoadLocation::Storage)] = builtin->name;
+	if (auto const* builtin = _dialect.transientLoadFunction(YulString{}))
+		m_loadFunctionName[static_cast<unsigned>(StoreLoadLocation::Storage)] = builtin->name;
+	if (auto const* builtin = _dialect.transientStoreFunction(YulString{}))
+		m_storeFunctionName[static_cast<unsigned>(StoreLoadLocation::Storage)] = builtin->name;
 }
 
 void DataFlowAnalyzer::operator()(ExpressionStatement& _statement)
