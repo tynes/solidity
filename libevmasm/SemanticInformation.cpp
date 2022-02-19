@@ -368,6 +368,8 @@ bool SemanticInformation::invalidInPureFunctions(Instruction _instruction)
 	case Instruction::GASLIMIT:
 	case Instruction::STATICCALL:
 	case Instruction::SLOAD:
+	case Instruction::TSTORE:
+	case Instruction::TLOAD:
 		return true;
 	default:
 		break;
@@ -393,6 +395,8 @@ bool SemanticInformation::invalidInViewFunctions(Instruction _instruction)
 	case Instruction::DELEGATECALL:
 	case Instruction::CREATE2:
 	case Instruction::SELFDESTRUCT:
+	case Instruction::TSTORE:
+	case Instruction::TLOAD:
 		return true;
 	default:
 		break;
