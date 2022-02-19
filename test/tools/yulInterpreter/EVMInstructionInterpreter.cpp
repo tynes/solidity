@@ -280,6 +280,10 @@ u256 EVMInstructionInterpreter::eval(
 		accessMemory(arg[0], 1);
 		m_state.memory[arg[0]] = uint8_t(arg[1] & 0xff);
 		return 0;
+	case Instruction::TLOAD:
+		return 0;
+	case Instruction::TSTORE:
+		return 0;
 	case Instruction::SLOAD:
 		return m_state.storage[h256(arg[0])];
 	case Instruction::SSTORE:
