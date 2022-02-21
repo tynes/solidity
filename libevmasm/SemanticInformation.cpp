@@ -55,7 +55,10 @@ vector<SemanticInformation::Operation> SemanticInformation::readWriteOperations(
 		if (memory(_instruction) == Effect::Write || storage(_instruction) == Effect::Write)
 			op.effect = Effect::Write;
 		else
+		{
+			assertThrow(memory(_instruction) == Effect::Read || storage(_instruction) == Effect::Read, "");
 			op.effect = Effect::Read;
+		}
 
 		op.location =
 			(_instruction == Instruction::SSTORE || _instruction == Instruction::SLOAD) ?
