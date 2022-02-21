@@ -554,6 +554,25 @@ map<string, Json::Value> CommandLineInterface::parseAstFromInput()
 	return sourceJsons;
 }
 
+map<string, Json::Value> CommandLineInterface::parseEvmAssemblyJsonFromInput()
+{
+	solAssert(m_options.input.mode == InputMode::CompilerWithEvmAssemblyJsonImport, "");
+	solAssert(m_fileReader.sourceUnits().size() == 1, "");
+
+	map<string, Json::Value> sourceJsons;
+
+	for (auto const& iter: m_fileReader.sourceUnits())
+	{
+		Json::Value evmAsmJson;
+		astAssert(jsonParseStrict(iter.second, evmAsmJson), "Input file could not be parsed to JSON");
+		astAssert(evmAsmJson.isMember(".code"), "Invalid Format for assembly-JSON: Must have '.code'-object");
+		astAssert(evmAsmJson.isMember(".data"), "Invalid Format for assembly-JSON: Must have '.data'-object");
+		sourceJsons[iter.first] = evmAsmJson;
+	}
+
+	return sourceJsons;
+}
+
 void CommandLineInterface::createFile(string const& _fileName, string const& _data)
 {
 	namespace fs = boost::filesystem;
@@ -657,6 +676,7 @@ void CommandLineInterface::processInput()
 		break;
 	case InputMode::Compiler:
 	case InputMode::CompilerWithASTImport:
+	case InputMode::CompilerWithEvmAssemblyJsonImport:
 		compile();
 		outputCompilationResults();
 	}
@@ -677,7 +697,11 @@ void CommandLineInterface::printLicense()
 
 void CommandLineInterface::compile()
 {
-	solAssert(m_options.input.mode == InputMode::Compiler || m_options.input.mode == InputMode::CompilerWithASTImport, "");
+	solAssert(
+		m_options.input.mode == InputMode::Compiler ||
+		m_options.input.mode == InputMode::CompilerWithASTImport ||
+		m_options.input.mode == InputMode::CompilerWithEvmAssemblyJsonImport, ""
+	);
 
 	m_compiler = make_unique<CompilerStack>(m_fileReader.reader());
 
@@ -724,7 +748,18 @@ void CommandLineInterface::compile()
 
 		m_compiler->setOptimiserSettings(m_options.optimiserSettings());
 
-		if (m_options.input.mode == InputMode::CompilerWithASTImport)
+		if (m_options.input.mode == InputMode::CompilerWithEvmAssemblyJsonImport)
+		{
+			try
+			{
+				m_compiler->importEvmAssemblyJson(parseEvmAssemblyJsonFromInput());
+			}
+			catch (Exception const& _exc)
+			{
+				solThrow(CommandLineExecutionError, "Failed to import Evm Assembly JSON: "s + _exc.what());
+			}
+		}
+		else if (m_options.input.mode == InputMode::CompilerWithASTImport)
 		{
 			try
 			{
@@ -784,7 +819,11 @@ void CommandLineInterface::compile()
 
 void CommandLineInterface::handleCombinedJSON()
 {
-	solAssert(m_options.input.mode == InputMode::Compiler || m_options.input.mode == InputMode::CompilerWithASTImport, "");
+	solAssert(
+		m_options.input.mode == InputMode::Compiler ||
+		m_options.input.mode == InputMode::CompilerWithASTImport ||
+		m_options.input.mode == InputMode::CompilerWithEvmAssemblyJsonImport, ""
+	);
 
 	if (!m_options.compiler.combinedJsonRequests.has_value())
 		return;
@@ -876,7 +915,11 @@ void CommandLineInterface::handleCombinedJSON()
 
 void CommandLineInterface::handleAst()
 {
-	solAssert(m_options.input.mode == InputMode::Compiler || m_options.input.mode == InputMode::CompilerWithASTImport, "");
+	solAssert(
+		m_options.input.mode == InputMode::Compiler ||
+		m_options.input.mode == InputMode::CompilerWithASTImport ||
+		m_options.input.mode == InputMode::CompilerWithEvmAssemblyJsonImport, ""
+	);
 
 	if (!m_options.compiler.outputs.astCompactJson)
 		return;
@@ -1120,7 +1163,11 @@ void CommandLineInterface::assemble(yul::AssemblyStack::Language _language, yul:
 
 void CommandLineInterface::outputCompilationResults()
 {
-	solAssert(m_options.input.mode == InputMode::Compiler || m_options.input.mode == InputMode::CompilerWithASTImport, "");
+	solAssert(
+		m_options.input.mode == InputMode::Compiler ||
+		m_options.input.mode == InputMode::CompilerWithASTImport ||
+		m_options.input.mode == InputMode::CompilerWithEvmAssemblyJsonImport, ""
+	);
 
 	handleCombinedJSON();
 
