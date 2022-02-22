@@ -35,15 +35,36 @@ vector<SemanticInformation::Operation> SemanticInformation::readWriteOperations(
 	{
 	case Instruction::SSTORE:
 	case Instruction::SLOAD:
+	{
+		assertThrow(memory(_instruction) == Effect::None, OptimizerException, "");
+		assertThrow(storage(_instruction) != Effect::None, OptimizerException, "");
+		Operation op;
+		op.effect = storage(_instruction);
+		op.location = Location::Storage;
+		op.startParameter = 0;
+		// We know that exactly one slot is affected.
+		op.lengthConstant = 1;
+		return {op};
+	}
 	case Instruction::MSTORE:
 	case Instruction::MSTORE8:
 	case Instruction::MLOAD:
+	{
+		assertThrow(memory(_instruction) != Effect::None, OptimizerException, "");
+		assertThrow(storage(_instruction) == Effect::None, OptimizerException, "");
+		Operation op;
+		op.effect = memory(_instruction);
+		op.location = Location::Memory;
+		op.startParameter = 0;
+		if (_instruction == Instruction::MSTORE || _instruction == Instruction::MLOAD)
+			op.lengthConstant = 32;
+		else if (_instruction == Instruction::MSTORE8)
+			op.lengthConstant = 1;
+
+		return {op};
+	}
 	case Instruction::REVERT:
 	case Instruction::RETURN:
-	case Instruction::EXTCODECOPY:
-	case Instruction::CODECOPY:
-	case Instruction::CALLDATACOPY:
-	case Instruction::RETURNDATACOPY:
 	case Instruction::KECCAK256:
 	case Instruction::LOG0:
 	case Instruction::LOG1:
@@ -51,54 +72,37 @@ vector<SemanticInformation::Operation> SemanticInformation::readWriteOperations(
 	case Instruction::LOG3:
 	case Instruction::LOG4:
 	{
+		assertThrow(storage(_instruction) == Effect::None, OptimizerException, "");
+		assertThrow(memory(_instruction) == Effect::Read, OptimizerException, "");
 		Operation op;
-		if (memory(_instruction) == Effect::Write || storage(_instruction) == Effect::Write)
-			op.effect = Effect::Write;
-		else
-		{
-			assertThrow(memory(_instruction) == Effect::Read || storage(_instruction) == Effect::Read, "");
-			op.effect = Effect::Read;
-		}
-
-		op.location =
-			(_instruction == Instruction::SSTORE || _instruction == Instruction::SLOAD) ?
-			Location::Storage :
-			Location::Memory;
-
-		if (_instruction == Instruction::EXTCODECOPY)
-			op.startParameter = 1;
-		else
-			op.startParameter = 0;
-
-		if (_instruction == Instruction::MSTORE || _instruction == Instruction::MLOAD)
-			op.lengthConstant = 32;
-		else if (_instruction == Instruction::MSTORE8)
-			op.lengthConstant = 1;
-		else if (
-			_instruction == Instruction::REVERT ||
-			_instruction == Instruction::RETURN ||
-			_instruction == Instruction::KECCAK256 ||
-			_instruction == Instruction::LOG0 ||
-			_instruction == Instruction::LOG1 ||
-			_instruction == Instruction::LOG2 ||
-			_instruction == Instruction::LOG3 ||
-			_instruction == Instruction::LOG4
-		)
-			op.lengthParameter = 1;
-		else if (_instruction == Instruction::EXTCODECOPY)
-			op.lengthParameter = 3;
-		else if (
-			_instruction == Instruction::CALLDATACOPY ||
-			_instruction == Instruction::CODECOPY ||
-			_instruction == Instruction::RETURNDATACOPY
-		)
-			op.lengthParameter = 2;
-		else if (_instruction == Instruction::SSTORE || _instruction == Instruction::SLOAD)
-			// Storage operations, length is unused / non-sensical
-			op.lengthConstant = 1;
-		else
-			assertThrow(false, AssemblyException, "");
-
+		op.effect = memory(_instruction);
+		op.location = Location::Memory;
+		op.startParameter = 0;
+		op.lengthParameter = 1;
+		return {op};
+	}
+	case Instruction::EXTCODECOPY:
+	{
+		assertThrow(memory(_instruction) == Effect::Write, OptimizerException, "");
+		assertThrow(storage(_instruction) == Effect::None, OptimizerException, "");
+		Operation op;
+		op.effect = memory(_instruction);
+		op.location = Location::Memory;
+		op.startParameter = 1;
+		op.lengthParameter = 3;
+		return {op};
+	}
+	case Instruction::CODECOPY:
+	case Instruction::CALLDATACOPY:
+	case Instruction::RETURNDATACOPY:
+	{
+		assertThrow(memory(_instruction) == Effect::Write, OptimizerException, "");
+		assertThrow(storage(_instruction) == Effect::None, OptimizerException, "");
+		Operation op;
+		op.effect = memory(_instruction);
+		op.location = Location::Memory;
+		op.startParameter = 0;
+		op.lengthParameter = 2;
 		return {op};
 	}
 	case Instruction::STATICCALL:
