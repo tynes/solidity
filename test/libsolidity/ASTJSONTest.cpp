@@ -88,10 +88,22 @@ ASTJSONTest::ASTJSONTest(string const& _filename)
 	string_view baseName = _filename;
 	baseName.remove_suffix(4);
 
-	m_variants = {
-		TestVariant(baseName, CompilerStack::State::Parsed),
-		TestVariant(baseName, CompilerStack::State::AnalysisPerformed),
+	const std::vector<CompilerStack::State> variantCompileStates =
+	{
+		CompilerStack::State::Parsed,
+		CompilerStack::State::AnalysisPerformed
 	};
+
+	for (const auto state : variantCompileStates )
+	{
+		auto variant = TestVariant(baseName, state);
+		if (boost::filesystem::exists(variant.astFilename()))
+		{
+			variant.expectation = readFileAsString(variant.astFilename());
+			boost::replace_all(variant.expectation, "\r\n", "\n");
+			m_variants.push_back(variant);
+		}
+	}
 
 	ifstream file(_filename);
 	if (!file)
@@ -132,12 +144,6 @@ ASTJSONTest::ASTJSONTest(string const& _filename)
 
 	m_sources.emplace_back(sourceName.empty() ? "a" : sourceName, source);
 	file.close();
-
-	for (TestVariant& variant: m_variants)
-	{
-		variant.expectation = readFileAsString(variant.astFilename());
-		boost::replace_all(variant.expectation, "\r\n", "\n");
-	}
 }
 
 TestCase::TestResult ASTJSONTest::run(ostream& _stream, string const& _linePrefix, bool const _formatted)
