@@ -778,7 +778,7 @@ set<VariableDeclaration::Location> VariableDeclaration::allowedDataLocations() c
 	using Location = VariableDeclaration::Location;
 
 	if (!hasReferenceOrMappingType() || isStateVariable() || isEventOrErrorParameter())
-		return set<Location>{ Location::Unspecified };
+		return set<Location>{ Location::Unspecified, Location::Transient };
 	else if (isCallableOrCatchParameter())
 	{
 		set<Location> locations{ Location::Memory };
@@ -788,6 +788,7 @@ set<VariableDeclaration::Location> VariableDeclaration::allowedDataLocations() c
 			isLibraryFunctionParameter()
 		)
 			locations.insert(Location::Storage);
+			locations.insert(Location::Transient);
 		if (!isTryCatchParameter() && !isConstructorParameter())
 			locations.insert(Location::CallData);
 
@@ -795,7 +796,7 @@ set<VariableDeclaration::Location> VariableDeclaration::allowedDataLocations() c
 	}
 	else if (isLocalVariable())
 		// Further restrictions will be imposed later on.
-		return set<Location>{ Location::Memory, Location::Storage, Location::CallData };
+		return set<Location>{ Location::Memory, Location::Transient, Location::Storage, Location::CallData };
 	else
 		// Struct members etc.
 		return set<Location>{ Location::Unspecified };

@@ -1456,6 +1456,8 @@ TypeResult ReferenceType::unaryOperatorResult(Token _operator) const
 		return nullptr;
 	case DataLocation::Memory:
 		return TypeProvider::emptyTuple();
+	case DataLocation::Transient:
+		return isPointer() ? nullptr : TypeProvider::emptyTuple();
 	case DataLocation::Storage:
 		return isPointer() ? nullptr : TypeProvider::emptyTuple();
 	}
@@ -1464,7 +1466,8 @@ TypeResult ReferenceType::unaryOperatorResult(Token _operator) const
 
 bool ReferenceType::isPointer() const
 {
-	if (m_location == DataLocation::Storage)
+	if (m_location == DataLocation::Storage ||
+		m_location == DataLocation::Transient)
 		return m_isPointer;
 	else
 		return true;
@@ -1481,6 +1484,8 @@ string ReferenceType::stringForReferencePart() const
 	{
 	case DataLocation::Storage:
 		return string("storage ") + (isPointer() ? "pointer" : "ref");
+	case DataLocation::Transient:
+		return string("transient ") + (isPointer() ? "pointer" : "ref");
 	case DataLocation::CallData:
 		return "calldata";
 	case DataLocation::Memory:
@@ -1497,6 +1502,9 @@ string ReferenceType::identifierLocationSuffix() const
 	{
 	case DataLocation::Storage:
 		id += "_storage";
+		break;
+	case DataLocation::Transient:
+		id += "_transient";
 		break;
 	case DataLocation::Memory:
 		id += "_memory";
@@ -1662,6 +1670,10 @@ BoolResult ArrayType::validForLocation(DataLocation _loc) const
 			if (storageSizeUpperBound() >= bigint(1) << 256)
 				return BoolResult::err("Type too large for storage.");
 			break;
+		case DataLocation::Transient:
+			if (storageSizeUpperBound() >= bigint(1) << 256)
+				return BoolResult::err("Type too large for transient storage.");
+			break;
 	}
 	return true;
 }
@@ -1739,6 +1751,9 @@ vector<tuple<string, Type const*>> ArrayType::makeStackItems() const
 				return {std::make_tuple("offset", TypeProvider::uint256())};
 		case DataLocation::Memory:
 			return {std::make_tuple("mpos", TypeProvider::uint256())};
+		case DataLocation::Transient:
+			// byte offset inside storage value is omitted
+			return {std::make_tuple("tslot", TypeProvider::uint256())};
 		case DataLocation::Storage:
 			// byte offset inside storage value is omitted
 			return {std::make_tuple("slot", TypeProvider::uint256())};
@@ -2020,9 +2035,30 @@ FunctionType const* ContractType::newExpressionType() const
 vector<tuple<VariableDeclaration const*, u256, unsigned>> ContractType::stateVariables() const
 {
 	vector<VariableDeclaration const*> variables;
+	for (ContractDefinition const* contract: m_contract.annotation().linearizedBaseContracts | ranges::views::reverse) {
+		for (VariableDeclaration const* variable: contract->stateVariables())
+			if (!(variable->isConstant() || variable->immutable()) && variable->referenceLocation() != VariableDeclaration::Location::Transient)
+				variables.push_back(variable);
+	}
+	TypePointers types;
+	for (auto variable: variables)
+		types.push_back(variable->annotation().type);
+	StorageOffsets offsets;
+	offsets.computeOffsets(types);
+
+	vector<tuple<VariableDeclaration const*, u256, unsigned>> variablesAndOffsets;
+	for (size_t index = 0; index < variables.size(); ++index)
+		if (auto const* offset = offsets.offset(index))
+			variablesAndOffsets.emplace_back(variables[index], offset->first, offset->second);
+	return variablesAndOffsets;
+}
+
+vector<tuple<VariableDeclaration const*, u256, unsigned>> ContractType::transientStateVariables() const
+{
+	vector<VariableDeclaration const*> variables;
 	for (ContractDefinition const* contract: m_contract.annotation().linearizedBaseContracts | ranges::views::reverse)
 		for (VariableDeclaration const* variable: contract->stateVariables())
-			if (!(variable->isConstant() || variable->immutable()))
+			if (!(variable->isConstant() || variable->immutable()) && variable->referenceLocation() == VariableDeclaration::Location::Transient)
 				variables.push_back(variable);
 	TypePointers types;
 	for (auto variable: variables)
@@ -2355,6 +2391,11 @@ BoolResult StructType::validForLocation(DataLocation _loc) const
 		storageSizeUpperBound() >= bigint(1) << 256
 	)
 		return BoolResult::err("Type too large for storage.");
+	if (
+		_loc == DataLocation::Transient &&
+		storageSizeUpperBound() >= bigint(1) << 256
+	)
+		return BoolResult::err("Type too large for transient storage.");
 
 	return true;
 }
@@ -2452,6 +2493,8 @@ vector<tuple<string, Type const*>> StructType::makeStackItems() const
 			return {std::make_tuple("offset", TypeProvider::uint256())};
 		case DataLocation::Memory:
 			return {std::make_tuple("mpos", TypeProvider::uint256())};
+		case DataLocation::Transient:
+			return {std::make_tuple("tslot", TypeProvider::uint256())};
 		case DataLocation::Storage:
 			return {std::make_tuple("slot", TypeProvider::uint256())};
 	}

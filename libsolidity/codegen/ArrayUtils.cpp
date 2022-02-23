@@ -148,6 +148,12 @@ void ArrayUtils::copyArrayToStorage(ArrayType const& _targetType, ArrayType cons
 					_context << Instruction::DUP1 << Instruction::SLOAD;
 					_context << Instruction::DUP6 << Instruction::SSTORE;
 				}
+				else if (_sourceType.location() == DataLocation::Transient)
+				{
+					// just copy the slot, it contains length and data
+					_context << Instruction::DUP1 << Instruction::TLOAD;
+					_context << Instruction::DUP6 << Instruction::SSTORE;
+				}
 				else
 				{
 					_context << Instruction::DUP1;
@@ -1029,6 +1035,11 @@ void ArrayUtils::retrieveLength(ArrayType const& _arrayType, unsigned _stackDept
 		case DataLocation::Memory:
 			m_context << Instruction::MLOAD;
 			break;
+		case DataLocation::Transient:
+			m_context << Instruction::TLOAD;
+			if (_arrayType.isByteArrayOrString())
+				m_context.callYulFunction(m_context.utilFunctions().extractByteArrayLengthFunction(), 1, 1);
+			break;
 		case DataLocation::Storage:
 			m_context << Instruction::SLOAD;
 			if (_arrayType.isByteArrayOrString())
@@ -1081,6 +1092,56 @@ void ArrayUtils::accessIndex(ArrayType const& _arrayType, bool _doBoundsCheck, b
 			m_context << Instruction::DUP2;
 		m_context << Instruction::ADD;
 		break;
+	case DataLocation::Transient:
+	{
+		if (_keepReference)
+			m_context << Instruction::DUP2;
+		else
+			m_context << Instruction::SWAP1;
+		// stack: [<base_ref>] <index> <base_ref>
+
+		evmasm::AssemblyItem endTag = m_context.newTag();
+		if (_arrayType.isByteArrayOrString())
+		{
+			// Special case of short byte arrays.
+			m_context << Instruction::SWAP1;
+			m_context << Instruction::DUP2 << Instruction::TLOAD;
+			m_context << u256(1) << Instruction::AND << Instruction::ISZERO;
+			// No action needed for short byte arrays.
+			m_context.appendConditionalJumpTo(endTag);
+			m_context << Instruction::SWAP1;
+		}
+		if (_arrayType.isDynamicallySized())
+			CompilerUtils(m_context).computeHashStatic();
+		m_context << Instruction::SWAP1;
+		if (_arrayType.baseType()->storageBytes() <= 16)
+		{
+			// stack: <data_ref> <index>
+			// goal:
+			// <ref> <byte_number> = <base_ref + index / itemsPerSlot> <(index % itemsPerSlot) * byteSize>
+			unsigned byteSize = _arrayType.baseType()->storageBytes();
+			solAssert(byteSize != 0, "");
+			unsigned itemsPerSlot = 32 / byteSize;
+			m_context << u256(itemsPerSlot) << Instruction::SWAP2;
+			// stack: itemsPerSlot index data_ref
+			m_context
+				<< Instruction::DUP3 << Instruction::DUP3
+				<< Instruction::DIV << Instruction::ADD
+			// stack: itemsPerSlot index (data_ref + index / itemsPerSlot)
+				<< Instruction::SWAP2 << Instruction::SWAP1
+				<< Instruction::MOD;
+			if (byteSize != 1)
+				m_context << u256(byteSize) << Instruction::MUL;
+		}
+		else
+		{
+			if (_arrayType.baseType()->storageSize() != 1)
+				m_context << _arrayType.baseType()->storageSize() << Instruction::MUL;
+			m_context << Instruction::ADD << u256(0);
+		}
+		m_context << endTag;
+		break;
+	}
 	case DataLocation::Storage:
 	{
 		if (_keepReference)

@@ -62,6 +62,8 @@ bool SemanticInformation::breaksCSEAnalysisBlock(AssemblyItem const& _item, bool
 			return false;
 		if (_item.instruction() == Instruction::MSTORE)
 			return false;
+		if (_item.instruction() == Instruction::TSTORE)
+			return false;
 		if (!_msizeImportant && (
 			_item.instruction() == Instruction::MLOAD ||
 			_item.instruction() == Instruction::KECCAK256
@@ -245,6 +247,7 @@ SemanticInformation::Effect SemanticInformation::memory(Instruction _instruction
 	case Instruction::RETURNDATACOPY:
 	case Instruction::MSTORE:
 	case Instruction::MSTORE8:
+	case Instruction::TSTORE:
 	case Instruction::CALL:
 	case Instruction::CALLCODE:
 	case Instruction::DELEGATECALL:
@@ -255,6 +258,7 @@ SemanticInformation::Effect SemanticInformation::memory(Instruction _instruction
 	case Instruction::CREATE2:
 	case Instruction::KECCAK256:
 	case Instruction::MLOAD:
+	case Instruction::TLOAD:
 	case Instruction::MSIZE:
 	case Instruction::RETURN:
 	case Instruction::REVERT:
@@ -282,6 +286,7 @@ bool SemanticInformation::movableApartFromEffects(Instruction _instruction)
 	case Instruction::SLOAD:
 	case Instruction::KECCAK256:
 	case Instruction::MLOAD:
+	case Instruction::TLOAD:
 		return true;
 
 	default:
