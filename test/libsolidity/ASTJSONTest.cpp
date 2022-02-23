@@ -27,10 +27,10 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/replace.hpp>
+#include <boost/algorithm/string/trim.hpp>
 #include <boost/test/unit_test.hpp>
 #include <boost/throw_exception.hpp>
 
-#include <algorithm>
 #include <fstream>
 #include <memory>
 #include <stdexcept>
@@ -50,7 +50,7 @@ namespace
 
 string const sourceDelimiter("==== Source: ");
 
-const std::map<string, CompilerStack::State> compilerStateMap = {
+const map<string, CompilerStack::State> compilerStateMap = {
 	{"Empty", CompilerStack::State::Empty},
 	{"SourcesSet", CompilerStack::State::SourcesSet},
 	{"Parsed", CompilerStack::State::Parsed},
@@ -102,7 +102,7 @@ ASTJSONTest::ASTJSONTest(string const& _filename)
 	string source;
 	string line;
 	string const delimiter("// ----");
-	string const failMarker("// Fail on:");
+	string const failMarker("// failAfter:");
 	while (getline(file, line))
 	{
 		if (boost::algorithm::starts_with(line, sourceDelimiter))
@@ -118,12 +118,13 @@ ASTJSONTest::ASTJSONTest(string const& _filename)
 		}
 		else if (boost::algorithm::starts_with(line, failMarker))
 		{
-			string state = line.substr(failMarker.size(), line.size());
-			state.erase(std::remove_if(state.begin(), state.end(),
-									   [](unsigned char x){return std::isspace(x);}),
-						state.end());
-			solAssert(compilerStateMap.count(state), "Unsupported compiler state in sol file");
-			m_expectedFailState = compilerStateMap.at(state);
+			string state = line.substr(failMarker.size());
+			boost::algorithm::trim(state);
+			if (compilerStateMap.find(state) == compilerStateMap.end())
+				BOOST_THROW_EXCEPTION(runtime_error("Unsupported compiler state (" + state + ") in test contract file"));
+			if (m_expectedFailAfter.has_value())
+				BOOST_THROW_EXCEPTION(runtime_error("Duplicated \"failAfter\" directive"));
+			m_expectedFailAfter = compilerStateMap.at(state);
 		}
 		else if (!line.empty() && !boost::algorithm::starts_with(line, delimiter))
 			source += line + "\n";
@@ -161,7 +162,7 @@ TestCase::TestResult ASTJSONTest::run(ostream& _stream, string const& _linePrefi
 
 		if (!c.parseAndAnalyze(variant.stopAfter))
 		{
-			if (!m_expectedFailState || m_expectedFailState != c.state())
+			if (!m_expectedFailAfter.has_value() || m_expectedFailAfter.value() + 1 != c.state())
 			{
 				SourceReferenceFormatter formatter(_stream, c, _formatted, false);
 				formatter.printErrorInformation(c.errors());
